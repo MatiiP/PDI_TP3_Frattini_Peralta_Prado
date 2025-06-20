@@ -41,16 +41,18 @@ def procesar_video(ruta_video, salida_video):
     cv2.destroyAllWindows()
 
 def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
-    # Guarda el frame original si es necesario
     if guardar_imagenes:
         cv2.imwrite(os.path.join(carpeta_salida, "original.jpg"), frame)
 
-    # Conversión a escala de grises y reducción de ruido
     gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gris, (5, 5), 0)
     canny = cv2.Canny(blur, 70, 150)
 
-    # Define la región de interés en forma de trapecio
+    if guardar_imagenes:
+        cv2.imwrite(os.path.join(carpeta_salida, "gris.jpg"), gris)
+        cv2.imwrite(os.path.join(carpeta_salida, "blur.jpg"), blur)
+        cv2.imwrite(os.path.join(carpeta_salida, "canny.jpg"), canny)
+
     altura, ancho = canny.shape
     vertices = np.array([[ 
         (int(ancho * 0.1), int(altura * 0.95)),
@@ -64,14 +66,21 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
     cv2.fillPoly(mascara, vertices, 255)
     roi = cv2.bitwise_and(canny, mascara)
 
-    # Detecta líneas con Hough Transform
+    if guardar_imagenes:
+        # Guarda la máscara binaria por separado
+        cv2.imwrite(os.path.join(carpeta_salida, "mascara.jpg"), mascara)
+        
+        # Dibuja el polígono sobre el frame original (una copia)
+        roi_visual = frame.copy()
+        cv2.polylines(roi_visual, vertices, isClosed=True, color=(0, 255, 255), thickness=2)
+        cv2.imwrite(os.path.join(carpeta_salida, "roi.jpg"), roi_visual)
+
     lineas = cv2.HoughLinesP(roi, 1, np.pi / 180, 50, minLineLength=60, maxLineGap=120)
     imagen_lineas = np.zeros_like(frame)
 
     izquierda = []
     derecha = []
 
-    # Clasifica líneas según su pendiente
     if lineas is not None:
         for linea in lineas:
             x1, y1, x2, y2 = linea[0]
@@ -82,7 +91,6 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
                 elif pendiente > 0 and x1 > ancho / 2 and x2 > ancho / 2:
                     derecha.append((x1, y1, x2, y2))
 
-    # Promedia líneas para suavizar la trayectoria
     def promediar_lineas(lineas):
         if not lineas:
             return None
@@ -96,18 +104,17 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
         x1, x2 = int(np.polyval(poly, y1)), int(np.polyval(poly, y2))
         return x1, y1, x2, y2
 
-    # Dibuja líneas promediadas sobre la imagen
     linea_izquierda = promediar_lineas(izquierda)
     linea_derecha = promediar_lineas(derecha)
 
     if linea_izquierda:
-        # Rojo brillante (más intenso)
         cv2.line(imagen_lineas, (linea_izquierda[0], linea_izquierda[1]), (linea_izquierda[2], linea_izquierda[3]), (0, 0, 255), 4)
     if linea_derecha:
-        # Verde neón brillante
         cv2.line(imagen_lineas, (linea_derecha[0], linea_derecha[1]), (linea_derecha[2], linea_derecha[3]), (0, 0, 255), 4)
 
-    # Combina las líneas con el frame original
+    if guardar_imagenes:
+        cv2.imwrite(os.path.join(carpeta_salida, "lineas_detectadas.jpg"), imagen_lineas)
+
     resultado = cv2.addWeighted(frame, 1, imagen_lineas, 1, 0)
 
     if guardar_imagenes:
@@ -115,6 +122,8 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
 
     return resultado
 
-# Llamadas de ejemplo (ajustar las rutas a tus archivos)
-procesar_video("ruta_1.mp4", "resultado_ruta_1.mp4")
-procesar_video("ruta_2.mp4", "resultado_ruta_2.mp4")
+# Llamadas de ejemplo
+base_dir = os.path.dirname(os.path.abspath(__file__))
+procesar_video(os.path.join(base_dir, "ruta_1.mp4"), os.path.join(base_dir, "resultado_ruta_1.mp4"))
+procesar_video(os.path.join(base_dir, "ruta_2.mp4"), os.path.join(base_dir, "resultado_ruta_2.mp4"))
+
