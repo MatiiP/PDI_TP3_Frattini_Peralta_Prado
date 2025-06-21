@@ -30,10 +30,13 @@ def procesar_video(ruta_video, salida_video):
         out.write(resultado)
         primer_frame = False
 
+        # Se encuentra comentado para que no tarde tanto en correr el script.
+        """
         # Muestra el resultado en tiempo real
         cv2.imshow('Detección de Carril', resultado)
         if cv2.waitKey(1) == ord('q'):
             break
+        """
 
     # Libera recursos
     cap.release()
@@ -53,6 +56,8 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
         cv2.imwrite(os.path.join(carpeta_salida, "blur.jpg"), blur)
         cv2.imwrite(os.path.join(carpeta_salida, "canny.jpg"), canny)
 
+    # Primera region de interes que funciono bien, sin embargo, se cambio para que funcione mejor en los videos que agregamos extra.
+    """
     altura, ancho = canny.shape
     vertices = np.array([[ 
         (int(ancho * 0.1), int(altura * 0.95)),
@@ -65,14 +70,24 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
     mascara = np.zeros_like(canny)
     cv2.fillPoly(mascara, vertices, 255)
     roi = cv2.bitwise_and(canny, mascara)
+    """
 
+    # Máscara ROI (región de interés)
+    altura, ancho = canny.shape
+    poligono = np.array([
+        [(0, altura), (ancho // 2, altura // 2 + 30), (ancho, altura)]
+    ], np.int32)
+    mascara = np.zeros_like(canny)
+    cv2.fillPoly(mascara, poligono, 255)
+    roi = cv2.bitwise_and(canny, mascara)
+    
     if guardar_imagenes:
         # Guarda la máscara binaria por separado
         cv2.imwrite(os.path.join(carpeta_salida, "mascara.jpg"), mascara)
         
         # Dibuja el polígono sobre el frame original (una copia)
         roi_visual = frame.copy()
-        cv2.polylines(roi_visual, vertices, isClosed=True, color=(0, 255, 255), thickness=2)
+        cv2.polylines(roi_visual, poligono, isClosed=True, color=(0, 255, 255), thickness=2)
         cv2.imwrite(os.path.join(carpeta_salida, "roi.jpg"), roi_visual)
 
     lineas = cv2.HoughLinesP(roi, 1, np.pi / 180, 50, minLineLength=60, maxLineGap=120)
@@ -108,9 +123,9 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
     linea_derecha = promediar_lineas(derecha)
 
     if linea_izquierda:
-        cv2.line(imagen_lineas, (linea_izquierda[0], linea_izquierda[1]), (linea_izquierda[2], linea_izquierda[3]), (0, 0, 255), 4)
+        cv2.line(imagen_lineas, (linea_izquierda[0], linea_izquierda[1]), (linea_izquierda[2], linea_izquierda[3]), (17, 170, 0), 4)
     if linea_derecha:
-        cv2.line(imagen_lineas, (linea_derecha[0], linea_derecha[1]), (linea_derecha[2], linea_derecha[3]), (0, 0, 255), 4)
+        cv2.line(imagen_lineas, (linea_derecha[0], linea_derecha[1]), (linea_derecha[2], linea_derecha[3]), (17, 170, 0), 4)
 
     if guardar_imagenes:
         cv2.imwrite(os.path.join(carpeta_salida, "lineas_detectadas.jpg"), imagen_lineas)
@@ -126,4 +141,6 @@ def detectar_carril(frame, guardar_imagenes=False, carpeta_salida=None):
 base_dir = os.path.dirname(os.path.abspath(__file__))
 procesar_video(os.path.join(base_dir, "ruta_1.mp4"), os.path.join(base_dir, "resultado_ruta_1.mp4"))
 procesar_video(os.path.join(base_dir, "ruta_2.mp4"), os.path.join(base_dir, "resultado_ruta_2.mp4"))
+procesar_video(os.path.join(base_dir, "ruta_3.mp4"), os.path.join(base_dir, "resultado_ruta_3.mp4"))
+procesar_video(os.path.join(base_dir, "ruta_4.mp4"), os.path.join(base_dir, "resultado_ruta_4.mp4"))
 
